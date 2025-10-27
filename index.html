@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Adaptive Phase Designer — Direct Manipulation Timeline</title>
+  <style>
+    :root {
+      --bg: #0f1220; --panel: #151a2f; --panel-2: #1b2140; --text: #e6e9ff; --muted: #9aa3c7;
+      --accent: #6aa9ff; --accent-2: #8ef; --danger: #ff6a7a; --ok: #30d158; --border: #2a315a; --shadow: 0 10px 30px rgba(0,0,0,.25);
+      --intro: #2b6cb0; --loop: #38a169; --handle: #e6e9ff;
+    }
+
+    
+    html, body { height: 100%; background: var(--bg); color: var(--text); font: 14px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial; }
+    *, *::before, *::after { box-sizing: border-box; }
+    a { color: var(--accent); }
+
+    .app { display: grid; grid-template-columns: 300px 1fr; gap: 16px; padding: 16px; height: 100%; max-width: 1680px; margin: 0 auto; }
+    .panel { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; }
+    .panel h2 { margin: 0; padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 14px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    .panel .content { padding: 12px; overflow: auto; }
+
+    .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    input[type="text"], input[type="number"], textarea, select { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: #0c1022; color: var(--text); outline: none; box-shadow: inset 0 0 0 1px transparent; transition: box-shadow .2s ease; }
+    input:focus, textarea:focus, select:focus { box-shadow: inset 0 0 0 1px var(--accent); }
+    button { appearance: none; border: 1px solid var(--border); background: #0e1530; color: var(--text); padding: 8px 12px; border-radius: 10px; cursor: pointer; transition: transform .05s ease, background .15s ease, border-color .2s ease; }
+    button:hover { background: #121a3a; }
+    button:active { transform: translateY(1px); }
+    .btn-primary { background: linear-gradient(180deg, #1c2d67, #203578); border-color: #2c4aa7; }
+    .btn-danger { background: linear-gradient(180deg, #582233, #6b1e2b); border-color: #8f2a3e; }
+
+    .list { display: grid; gap: 8px; }
+    .item { border: 1px solid var(--border); border-radius: 12px; padding: 10px; background: rgba(255,255,255,0.02); display: grid; gap: 6px; }
+    .item .title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .item .meta { color: var(--muted); font-size: 12px; }
+    .item.active { outline: 2px solid var(--accent); }
+
+    .badge { display: inline-flex; align-items: center; gap: 6px; background: #0c1536; border: 1px solid #1a2f7a; color: #b9ccff; padding: 3px 8px; border-radius: 999px; font-size: 12px; }
+
+    /* Unified Player Panel */
+    .player { aspect-ratio: 16 / 9; width: 100%; background: #000; border-bottom: 1px solid var(--border); }
+    /* Make the embedded iframe responsive and compact in the Scenes preview */
+    #player iframe { width: 100% !important; height: auto !important; aspect-ratio: 16 / 9; display: block; }
+    #scenesPanel .player { margin-top: 4px; border: 1px solid var(--border); border-radius: 10px; }
+    .player-meta { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--muted); }
+    .transport { padding: 10px 12px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--border); }
+
+    /* Timeline */
+    .timeline-wrap { padding: 12px; }
+    #timeline { width: 100%; height: 180px; background: #0a0f25; border: 1px solid var(--border); border-radius: 10px; }
+    .legend { display: flex; gap: 16px; align-items: center; color: var(--muted); font-size: 12px; padding: 6px 2px 0; }
+    .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; }
+
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--border); background: #0a0f20; color: #b3beff; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- SCENES -->
+    <section class="panel" id="scenesPanel">
+      <h2>Scenes</h2>
+      <div class="content">
+        <div class="row"><input id="newSceneName" type="text" placeholder="Scene name" /></div>
+        <div class="row"><input id="newSceneUrl" type="text" placeholder="YouTube URL or Video ID" /></div>
+        <div class="row">
+          <button class="btn-primary" id="addSceneBtn">Add Scene</button>
+          <button id="duplicateSceneBtn">Duplicate</button>
+          <button class="btn-danger" id="deleteSceneBtn">Delete</button>
+        </div>
+        <div class="row"><small class="muted">Saved to <strong>localStorage</strong>. Export/Import below.</small></div>
+        <div class="list" id="sceneList"></div>
+        <div class="row" style="margin-top:8px">
+          <button id="exportBtn">Export</button>
+          <button id="importBtn">Import</button>
+        </div>
+        <div class="row" style="margin-top:10px"><label>Preview</label></div>
+        <div class="player" id="player"></div>
+      </div>
+    </section>
+
+    <!-- UNIFIED PLAYER + TIMELINE -->
+    <section class="panel" id="playerPanel">
+      <h2>Timeline</h2>
+      <div class="player-meta">
+        <div>
+          <span class="badge">Video Time: <span id="nowTime">0:00</span></span>
+          <span style="margin-left:8px" class="badge">Phase: <span id="phaseBadge">—</span></span>
+        </div>
+        <div class="badge">Vol: <span id="volLabel">100</span>%</div>
+      </div>
+
+      <div class="transport">
+        <button class="btn-primary" id="playSceneBtn">▶︎ Start</button>
+        <button id="pauseBtn">⏸ Pause</button>
+        <button id="prevPhaseBtn">⟵ Prev</button>
+        <button id="nextPhaseBtn">Next ⟶</button>
+        <span style="flex:1"></span>
+        <label>Fade (ms)
+          <input id="fadeMs" type="number" min="0" step="50" value="250" style="width:100px; margin-left:6px" />
+        </label>
+        <label style="margin-left:12px">Volume
+          <input id="volumeRange" type="range" min="0" max="100" value="100" style="vertical-align:middle" />
+        </label>
+      </div>
+
+      <div class="timeline-wrap">
+        <svg id="timeline"></svg>
+        <div id="phaseEditor" class="phase-editor" style="margin-top:8px"></div>
+        <div class="legend">
+          <span><span class="swatch" style="background:var(--intro)"></span>Intro (Start → LoopStart)</span>
+          <span><span class="swatch" style="background:var(--loop)"></span>Loop (LoopStart ↔ LoopEnd)</span>
+          <span>Click to seek • Drag handles to edit • Drag playhead to scrub</span>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="row">
+          <label style="flex:3">
+            <span>Scene Title</span>
+            <input id="sceneTitle" type="text" placeholder="—" />
+          </label>
+          <label style="flex:5">
+            <span>YouTube URL / ID</span>
+            <input id="sceneUrl" type="text" placeholder="https://www.youtube.com/watch?v=..." />
+          </label>
+          <button id="saveSceneMetaBtn" class="btn-primary" style="align-self:flex-end">Save</button>
+          <button id="reloadVideoBtn" style="align-self:flex-end">Reload</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    // ============ Helpers
+    const $ = (sel, root=document) => root.querySelector(sel);
+    const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+    function uid(){ return Math.random().toString(36).slice(2,9); }
+
+    function parseYouTubeId(input){
+      if (!input) return '';
+      const m = String(input).match(/(?:youtu\.be\/|v=|embed\/)([a-zA-Z0-9_-]{11})/);
+      if (m) return m[1]; if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return input; return '';
+    }
+    function fmtTime(t=0){ if (!isFinite(t)) return '0:00'; const s = Math.floor(t)%60; const m = Math.floor(t/60); return `${m}:${String(s).padStart(2,'0')}`; }
+    function clamp(n, a, b){ return Math.min(b, Math.max(a, n)); }
+
+    // ============ State
+    const storeKey = 'adaptive-scenes-v3-timeline';
+    let state = { scenes: [], selectedSceneId: null };
+    function saveState(){ localStorage.setItem(storeKey, JSON.stringify(state)); }
+    function loadState(){ try{ const raw = localStorage.getItem(storeKey); if (raw) state = JSON.parse(raw); }catch(_){} if (!state.scenes) state.scenes = []; }
+
+    // Bind timeline element lazily to avoid TDZ
+    let tl = null;
+    // Drag state for timeline interactions (must be declared before drawTimeline runs)
+    let drag = null; // {type:'playhead'|'handle', phaseIndex, handleKey, startX, origTime}
+
+    // ============ YouTube
+    let player = null; let ticker = null; let desiredVolume = 100; let currentPhaseIndex = 0; let lastLoopSeekAt = -999;
+    let duration = 0; // seconds
+
+    // Build a virtual finishing phase that plays to the end of the video
+    function getPhasesWithFinish(sc){
+      if (!sc) return [];
+      const d = duration||0;
+      let endStart = 0;
+      sc.phases.forEach(p=>{ endStart = Math.max(endStart, (p.loopEnd ?? p.start ?? 0)); });
+      const finish = { id: '__finish', name: 'Finish', start: endStart, loopEnd: d, _isFinish: true };
+      return [...sc.phases, finish];
+    }
+
+    function onYouTubeIframeAPIReady(){
+      player = new YT.Player('player', { height: '360', width: '640', videoId: '', playerVars:{ rel:0, modestbranding:1, playsinline:1, origin: location.origin }, events: { onReady: onPlayerReady } });
+    }
+    function onPlayerReady(){
+      tick(); ticker = setInterval(tick, 80);
+      $('#volumeRange').addEventListener('input', e => { desiredVolume = +e.target.value; $('#volLabel').textContent = desiredVolume; safeSetVolume(desiredVolume); });
+      const sc = getSelectedScene(); if (sc) loadSceneVideo(sc);
+      renderEditor();
+    }
+    function tick(){ if (!player || !player.getCurrentTime) return; const now = player.getCurrentTime()||0; $('#nowTime').textContent = fmtTime(now); duration = player.getDuration? (player.getDuration()||duration) : duration; handleLoop(now); drawTimeline(); }
+    function safeSetVolume(v){ try{ player.setVolume(v); }catch(_){} }
+    function fadeToVolume(target, ms=200){ target = clamp(target|0,0,100); const start = player?.getVolume? player.getVolume():100; const steps = Math.max(1, Math.floor(ms/25)); const d = (target-start)/steps; let i=0; clearInterval(window.__fade); window.__fade = setInterval(()=>{ i++; safeSetVolume(Math.round(start+d*i)); if(i>=steps){ clearInterval(window.__fade); safeSetVolume(target); } },25); }
+    function seekToSafe(t){ try{ player.seekTo(t, true);}catch(_){} }
+
+    function loadSceneVideo(scene){ const vid = parseYouTubeId(scene.url||scene.videoId||''); if (!vid) return; try{ player.cueVideoById({videoId:vid, startSeconds:0}); setTimeout(()=>{ duration = player.getDuration?.()||0; drawTimeline(); },400); }catch(_){} }
+
+    // ============ Scenes
+    function getSelectedScene(){ return state.scenes.find(s=>s.id===state.selectedSceneId)||null; }
+    function selectScene(id){ state.selectedSceneId = id; saveState(); renderScenes(); const sc = getSelectedScene(); if(sc) { loadSceneVideo(sc); currentPhaseIndex = 0; drawTimeline(); renderEditor(); }}
+
+    function addScene(){ const name = $('#newSceneName').value.trim()||'New Scene'; const url = $('#newSceneUrl').value.trim(); const scene = { id: uid(), name, url, phases: [] }; state.scenes.push(scene); state.selectedSceneId = scene.id; saveState(); renderScenes(); loadSceneVideo(scene); }
+    function duplicateScene(){ const sc=getSelectedScene(); if(!sc) return; const copy=JSON.parse(JSON.stringify(sc)); copy.id=uid(); copy.name=sc.name+' (Copy)'; state.scenes.push(copy); state.selectedSceneId=copy.id; saveState(); renderScenes(); loadSceneVideo(copy); }
+    function deleteScene(){ if(!getSelectedScene()) return; if(!confirm('Delete this scene?')) return; state.scenes=state.scenes.filter(s=>s.id!==state.selectedSceneId); state.selectedSceneId=state.scenes[0]?.id||null; saveState(); renderScenes(); if(state.selectedSceneId) loadSceneVideo(getSelectedScene()); }
+    function saveSceneMeta(){ const sc=getSelectedScene(); if(!sc) return; sc.name=$('#sceneTitle').value.trim()||'Untitled Scene'; sc.url=$('#sceneUrl').value.trim(); saveState(); renderScenes(); loadSceneVideo(sc); }
+
+    // Seed
+    loadState();
+    if(!state.scenes.length){ state.scenes.push({ id: uid(), name: 'Example: Direct Timeline', url:'https://www.youtube.com/watch?v=jfKfPfyJRdk', phases:[ {id:uid(), name:'Phase 1', start:0, loopStart:10, loopEnd:22}, {id:uid(), name:'Phase 2', start:22, loopStart:40, loopEnd:58}, {id:uid(), name:'Phase 3', start:58, loopStart:75, loopEnd:95} ] }); state.selectedSceneId = state.scenes[0].id; saveState(); }
+
+    // ============ UI Render (Scenes sidebar + meta)
+    function renderScenes(){
+      const list=$('#sceneList'); list.innerHTML='';
+      for(const sc of state.scenes){ const div=document.createElement('div'); div.className='item'+(sc.id===state.selectedSceneId?' active':''); div.innerHTML=`<div class="title-row"><strong>${sc.name||'Untitled'}</strong><button data-act="open">Open</button></div><div class="meta">${parseYouTubeId(sc.url)||'—'} • ${sc.phases.length} phases</div>`; div.querySelector('[data-act="open"]').onclick=()=>selectScene(sc.id); list.appendChild(div);}      
+      const sc=getSelectedScene(); $('#sceneTitle').value=sc?sc.name:''; $('#sceneUrl').value=sc?sc.url||'':''; $('#newSceneName').value=''; $('#newSceneUrl').value=''; renderPhaseBadge(); drawTimeline();
+    }
+    renderScenes();
+    renderEditor();
+    renderEditor();
+
+    // ============ Transport & Looping behavior
+    function playScene(){ const sc=getSelectedScene(); if(!sc) return; const phs=getPhasesWithFinish(sc); if(!phs.length) return; currentPhaseIndex=0; playCurrent(true); }
+    function playCurrent(seekToStart=false){ const sc=getSelectedScene(); if(!sc) return; const phs=getPhasesWithFinish(sc); const ph=phs[currentPhaseIndex]; if(!ph) return; const fadeMs=+($('#fadeMs').value||0); const vol=+($('#volumeRange').value||100); if(seekToStart){ fadeToVolume(0, Math.min(200,fadeMs)); setTimeout(()=>{ seekToSafe(ph.start||0); player.playVideo?.(); setTimeout(()=>fadeToVolume(vol,fadeMs),80); }, Math.min(220,fadeMs)); } else { player.playVideo?.(); } renderPhaseBadge(); renderEditor(); }
+    function nextPhase(){ const sc=getSelectedScene(); if(!sc) return; const phs=getPhasesWithFinish(sc); if(currentPhaseIndex+1<phs.length){ currentPhaseIndex++; renderPhaseBadge(); renderEditor(); }}
+    function prevPhase(){ const sc=getSelectedScene(); if(!sc) return; if(currentPhaseIndex-1>=0){ currentPhaseIndex--; renderPhaseBadge(); renderEditor(); }}
+    function pause(){ try{ player.pauseVideo(); }catch(_){} }
+    function renderPhaseBadge(){ const sc=getSelectedScene(); const label=sc&&sc.phases[currentPhaseIndex]? `${currentPhaseIndex+1}/${sc.phases.length} · ${sc.phases[currentPhaseIndex].name}`:'—'; $('#phaseBadge').textContent=label; }
+
+    function handleLoop(now){ const sc=getSelectedScene(); if(!sc) return; const phs=getPhasesWithFinish(sc); const ph=phs[currentPhaseIndex]; if(!ph || ph._isFinish) return; const eps=0.05; if(now < (ph.loopStart||0) - eps) return; if(now >= (ph.loopEnd||0) - eps){ if(Math.abs(now-lastLoopSeekAt)<0.2) return; lastLoopSeekAt=now; const fadeMs=+($('#fadeMs').value||0); const vol=+($('#volumeRange').value||100); fadeToVolume(0, Math.min(180,fadeMs)); setTimeout(()=>{ seekToSafe(ph.loopStart); player.playVideo?.(); setTimeout(()=>fadeToVolume(vol,fadeMs),60); }, Math.min(200,fadeMs)); }}
+
+    // ============ Timeline (SVG)
+    // tl is initialized lazily inside drawTimeline() to avoid TDZ issues
+
+    function drawTimeline(){
+      if (!tl) tl = document.getElementById('timeline');
+      if (!tl) return;
+      const sc=getSelectedScene(); if(!sc){ tl.innerHTML=''; return; }
+      const W = tl.clientWidth || tl.parentElement.clientWidth || 900; const H = tl.clientHeight || 180;
+      // Increased paddings to prevent clipping of time labels and to give more left gutter for titles
+      const PADL=110, PADR=24, PADT=44, PADB=32;
+      const innerW=W-PADL-PADR; const rowH=30;
+      const phases = getPhasesWithFinish(sc);
+      const rows=phases.length; const totalH = Math.max(PADT + rows*rowH + PADB, H);
+      tl.setAttribute('width', W); tl.setAttribute('height', totalH);
+
+      const dur = Math.max(1, duration || estimateDuration(sc));
+      const xOf = t => PADL + (t/dur)*innerW;
+      const tOf = x => clamp(((x-PADL)/innerW)*dur, 0, dur);
+
+      const now = player?.getCurrentTime?.()||0;
+      const xNow = xOf(now);
+
+      // background and grid
+      let svg='';
+      svg += `<rect x="0" y="0" width="${W}" height="${totalH}" rx="10" ry="10" fill="#0a0f25" stroke="rgba(255,255,255,.06)"/>`;
+      // defs for arrow marker used to indicate loop path
+      svg += `<defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#9aa3c7" />
+        </marker>
+      </defs>`;
+      // time ruler ticks (every 10s)
+      const tick = pickTick(dur, innerW);
+      for(let t=0;t<=dur+0.001;t+=tick){ const x=xOf(t); svg+=`<line x1="${x}" y1="${PADT-18}" x2="${x}" y2="${totalH-PADB}" stroke="rgba(255,255,255,.06)"/>`; svg+=`<text x="${x}" y="${PADT-22}" fill="#7f8bb8" font-size="10" text-anchor="middle">${fmtTime(t)}</text>`; }
+
+      // phases rows
+      phases.forEach((ph, idx)=>{
+        const y = PADT + idx*rowH + 4;
+        const isFinish = !!ph._isFinish;
+        const start = clamp(ph.start||0,0,dur), ls=clamp(ph.loopStart||start,0,dur), le=clamp(ph.loopEnd||dur,0,dur);
+        const xs=xOf(start), xls=xOf(ls), xle=xOf(le);
+        const isActive = idx === currentPhaseIndex;
+        // active row highlight
+        if (isActive) {
+          svg += `<rect x="${PADL}" y="${y-3}" width="${innerW}" height="24" rx="6" fill="rgba(106,169,255,0.08)" stroke="rgba(106,169,255,0.45)" />`;
+        }
+        // labels
+        svg += `<text x="14" y="${y+12}" fill="#bcd" font-size="12" font-weight="${isActive?700:400}">${idx+1}. ${escapeXml(ph.name||('Phase '+(idx+1)))}</text>`;
+        // intro segment
+        svg += `<rect x="${xs}" y="${y}" width="${Math.max(0,xls-xs)}" height="18" fill="var(--intro)" opacity="${isFinish?0.6:0.85}" rx="4"/>`;
+        // loop segment
+        svg += `<rect x="${xls}" y="${y}" width="${Math.max(0,xle-xls)}" height="18" fill="var(--loop)" opacity="${isFinish?0.0:0.9}" rx="4"/>`;
+        // progress overlays
+        if (isActive) {
+          if (now >= start && now < ls) {
+            const px = Math.max(0, Math.min(xls, xNow) - xs);
+            if (px > 0) svg += `<rect x="${xs}" y="${y}" width="${px}" height="18" fill="#6aa9ff" opacity="0.28" rx="4"/>`;
+          }
+          if (!isFinish && now >= ls) {
+            const px2 = Math.max(0, Math.min(xle, xNow) - xls);
+            if (px2 > 0) svg += `<rect x="${xls}" y="${y}" width="${px2}" height="18" fill="#8ef" opacity="0.22" rx="4"/>`;
+          }
+        }
+        // handles (start, loopStart, loopEnd)
+        if (!isFinish) {
+          svg += handleCircle(xs, y+9, idx, 'start');
+          svg += handleCircle(xls, y+9, idx, 'loopStart');
+          svg += handleCircle(xle, y+9, idx, 'loopEnd');
+        }
+        // emphasize handles for active phase
+        if (isActive && !isFinish) {
+          svg += ring(xs, y+9);
+          svg += ring(xls, y+9);
+          svg += ring(xle, y+9);
+        }
+        // loop back indicator for active phase (dashed arrow from LoopEnd to LoopStart)
+        if (isActive && !isFinish && le > ls) {
+          const ay = y - 4; // draw a hair above the row
+          svg += `<line x1="${xle}" y1="${ay}" x2="${xls}" y2="${ay}" stroke="#9aa3c7" stroke-dasharray="5,4" stroke-width="1.5" marker-end="url(#arrow)"/>`;
+        }
+        // click zones to select phase
+        svg += `<rect x="${PADL}" y="${y}" width="${innerW}" height="18" fill="transparent" data-phase="${idx}" class="hit"/>`;
+      });
+
+      // playhead
+      svg += `<line x1="${xNow}" y1="${PADT-18}" x2="${xNow}" y2="${totalH-PADB}" stroke="${drag?.type==='playhead'?'#fff':'#e6e9ff'}" stroke-width="2" data-playhead="1"/>`;
+      svg += `<circle cx="${xNow}" cy="${PADT-24}" r="6" fill="#e6e9ff" data-playhead="1"/>`;
+
+      tl.innerHTML = svg;
+
+      // Interactions
+      // Scrub/click
+      tl.querySelectorAll('[data-playhead]')?.forEach(el=>{ el.onpointerdown = (e)=>{ const r=tl.getBoundingClientRect(); const x=e.clientX-r.left; drag={type:'playhead', startX:x, origTime:now, xOf, tOf}; tl.setPointerCapture(e.pointerId); e.preventDefault(); } });
+      // Click to seek anywhere
+      tl.onpointerdown = tl.onpointerdown || function(e){ const target = e.target; if (target.classList.contains('hit')){ const pIdx = +target.getAttribute('data-phase'); currentPhaseIndex = pIdx; renderPhaseBadge(); renderEditor(); drawTimeline(); }
+      };
+      // Handle drags
+      tl.querySelectorAll('[data-handle]')?.forEach(el=>{
+        el.onpointerdown = (e)=>{ const r=tl.getBoundingClientRect(); const x=e.clientX-r.left; const phaseIndex=+el.getAttribute('data-phase'); const key=el.getAttribute('data-handle'); drag={type:'handle', phaseIndex, handleKey:key, startX:x, xOf, tOf}; tl.setPointerCapture(e.pointerId); e.preventDefault(); };
+      });
+
+      tl.onpointermove = (e)=>{
+        if(!drag) return; const r=tl.getBoundingClientRect(); const x=e.clientX-r.left; const t = drag.tOf(x);
+        if(drag.type==='playhead'){ seekToSafe(t); }
+        if(drag.type==='handle'){
+          const sc=getSelectedScene(); const ph=sc.phases[drag.phaseIndex]; const dur = Math.max(1, duration||estimateDuration(sc));
+          if(drag.handleKey==='start'){ ph.start = clamp(t, 0, Math.min(ph.loopStart||dur, dur)); }
+          if(drag.handleKey==='loopStart'){ ph.loopStart = clamp(t, ph.start||0, Math.min(ph.loopEnd||dur, dur)); }
+          if(drag.handleKey==='loopEnd'){ ph.loopEnd = clamp(t, Math.max(ph.loopStart||0, (ph.start||0)+0.01), dur); }
+          saveState(); // live update
+        }
+      };
+      tl.onpointerup = tl.onpointercancel = ()=>{ drag=null; };
+
+      // helper closures
+      function handleCircle(x, y, phaseIndex, key){
+        return `<circle cx="${x}" cy="${y}" r="6" fill="${key==='start'?'#9ec4ff': key==='loopStart'?'#a8f0c9':'#ffd1d6'}" stroke="#0b1230" stroke-width="1.5" data-handle="${key}" data-phase="${phaseIndex}"/>`;
+      }
+      function ring(cx, cy){
+        return `<circle cx="${cx}" cy="${cy}" r="8.5" fill="none" stroke="rgba(106,169,255,0.7)" stroke-width="1.2"/>`;
+      }
+      function pickTick(dur, px){ // nice tick spacing ~80-120px
+        const targetPx=100; const perSec = px/dur; const raw = targetPx/perSec; const steps=[5,10,15,20,30,60,120,180,300]; let best=steps[0]; for(const s of steps){ if (s>=raw){ best=s; break; } } return best; }
+      function estimateDuration(sc){ // guess from last loopEnd
+        let g=0; sc.phases.forEach(p=>{ g=Math.max(g, p.loopEnd||0, p.start||0); }); return Math.max(g, 60); }
+      function escapeXml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c])); }
+    }
+
+    // ============ Phase Editor Panel (below timeline)
+    function renderEditor(){
+      const container = document.getElementById('phaseEditor');
+      if (!container) return;
+      const sc = getSelectedScene();
+      if (!sc) { container.style.display='none'; container.innerHTML=''; return; }
+      const phases = getPhasesWithFinish(sc);
+      const ph = phases[currentPhaseIndex];
+      if (!ph) { container.style.display='none'; container.innerHTML=''; return; }
+      container.style.display='block';
+      if (ph._isFinish){
+        container.innerHTML = `<div class="item"><div class="title-row"><strong>Finish</strong><span class="meta">Plays to the end of the video</span></div><div class="row" style="margin-top:6px"><button id="seekFinishStart">Seek to start</button><span style="flex:1"></span><button id="addPhaseAtEnd" class="btn-primary">Add Phase at End</button></div></div>`;
+        const btn = document.getElementById('seekFinishStart');
+        if (btn) btn.onclick = ()=>{ seekToSafe(ph.start||0); };
+        const addEnd = document.getElementById('addPhaseAtEnd');
+        if (addEnd) addEnd.onclick = ()=>{ addPhaseAfter(getSelectedScene(), (getSelectedScene().phases.length-1), ph.start||0, true); };
+        return;
+      }
+      const s = (ph.start||0).toFixed(2);
+      const ls = (ph.loopStart||0).toFixed(2);
+      const le = (ph.loopEnd||0).toFixed(2);
+      container.innerHTML = `
+        <div class="item">
+          <div class="title-row"><strong>Edit Phase</strong></div>
+          <div class="row">
+            <label style=\"flex:2\"><span>Name</span><input id=\"edName\" type=\"text\"></label>
+            <span style=\"flex:1\"></span>
+          </div>
+          <div class="row">
+            <label style="flex:1"><span>Start (s)</span><input id="edStart" type="number" step="0.1" min="0" value="${s}"></label>
+            <label style="flex:1"><span>Loop Start (s)</span><input id="edLoopStart" type="number" step="0.1" min="0" value="${ls}"></label>
+            <label style="flex:1"><span>Loop End (s)</span><input id="edLoopEnd" type="number" step="0.1" min="0" value="${le}"></label>
+            <span style="flex:1"></span>
+            <button id="seekStart">Seek Start</button>
+            <button id="seekLS">Seek LoopStart</button>
+            <button id="seekLE">Seek LoopEnd</button>
+          </div>
+            <div class="row" style="margin-top:6px">
+              <button id="addBefore">Add Before</button>
+              <button id="addAfter" class="btn-primary">Add After</button>
+              <button id="dupPhase">Duplicate</button>
+              <span style="flex:1"></span>
+              <button id="delPhase" class="btn-danger">Delete</button>
+            </div>
+        </div>`;
+      const edName = document.getElementById('edName');
+      if (edName) {
+        edName.value = ph.name || '';
+        edName.addEventListener('input', ()=>{ ph.name = edName.value; saveState(); renderScenes(); renderPhaseBadge(); drawTimeline(); });
+      }
+      const edStart = document.getElementById('edStart');
+      const edLS = document.getElementById('edLoopStart');
+      const edLE = document.getElementById('edLoopEnd');
+      function commit(){
+        const d = duration || 10_000;
+        let vS = parseFloat(edStart.value); if (!isFinite(vS)) vS = 0;
+        let vLS = parseFloat(edLS.value); if (!isFinite(vLS)) vLS = vS;
+        let vLE = parseFloat(edLE.value); if (!isFinite(vLE)) vLE = vLS;
+        if (vLS < vS) vLS = vS;
+        if (vLE < vLS) vLE = vLS;
+        if (vLE > d) vLE = d;
+        ph.start = vS; ph.loopStart = vLS; ph.loopEnd = vLE;
+        edStart.value = vS.toFixed(2); edLS.value = vLS.toFixed(2); edLE.value = vLE.toFixed(2);
+        saveState(); drawTimeline();
+      }
+      edStart.addEventListener('change', commit);
+      edLS.addEventListener('change', commit);
+      edLE.addEventListener('change', commit);
+      const bS = document.getElementById('seekStart'); if (bS) bS.onclick = ()=>seekToSafe(ph.start||0);
+      const bLS = document.getElementById('seekLS'); if (bLS) bLS.onclick = ()=>seekToSafe(ph.loopStart||0);
+      const bLE = document.getElementById('seekLE'); if (bLE) bLE.onclick = ()=>seekToSafe(ph.loopEnd||0);
+
+      // Add / Duplicate / Delete actions
+      const ab = document.getElementById('addBefore'); if (ab) ab.onclick = ()=>addPhaseBefore(getSelectedScene(), currentPhaseIndex, ph.start||0);
+      const aa = document.getElementById('addAfter'); if (aa) aa.onclick = ()=>addPhaseAfter(getSelectedScene(), currentPhaseIndex, ph.loopEnd||ph.start||0);
+      const dp = document.getElementById('dupPhase'); if (dp) dp.onclick = ()=>duplicatePhase(getSelectedScene(), currentPhaseIndex);
+      const dl = document.getElementById('delPhase'); if (dl) dl.onclick = ()=>deletePhase(getSelectedScene(), currentPhaseIndex);
+    }
+
+    // ============ Phase CRUD helpers
+    function clamp01(x){ return Math.max(0, x); }
+    function defaultPhaseTimes(baseStart){
+      const d = duration || 300; // fallback when duration unknown
+      const s = clamp01(baseStart||0);
+      const ls = Math.min(d, s + 8);
+      const le = Math.min(d, ls + 12);
+      return { start:s, loopStart:ls, loopEnd:le };
+    }
+    function addPhaseBefore(sc, index, baseStart){
+      if (!sc) return;
+      const t = defaultPhaseTimes(baseStart);
+      const p = { id: uid(), name: 'New Phase', start: t.start, loopStart: t.loopStart, loopEnd: t.loopEnd };
+      const insertAt = Math.max(0, Math.min(index, sc.phases.length));
+      sc.phases.splice(insertAt, 0, p);
+      currentPhaseIndex = insertAt;
+      saveState(); renderScenes(); drawTimeline(); renderEditor();
+    }
+    function addPhaseAfter(sc, index, baseStart, atEnd=false){
+      if (!sc) return;
+      const insertAt = atEnd ? sc.phases.length : Math.max(0, Math.min(index+1, sc.phases.length));
+      const t = defaultPhaseTimes(baseStart);
+      const p = { id: uid(), name: 'New Phase', start: t.start, loopStart: t.loopStart, loopEnd: t.loopEnd };
+      sc.phases.splice(insertAt, 0, p);
+      currentPhaseIndex = insertAt;
+      saveState(); renderScenes(); drawTimeline(); renderEditor();
+    }
+    function duplicatePhase(sc, index){
+      if (!sc) return;
+      if (index < 0 || index >= sc.phases.length) return;
+      const src = sc.phases[index];
+      const copy = JSON.parse(JSON.stringify(src));
+      copy.id = uid();
+      copy.name = (src.name||'Phase') + ' (Copy)';
+      sc.phases.splice(index+1, 0, copy);
+      currentPhaseIndex = index+1;
+      saveState(); renderScenes(); drawTimeline(); renderEditor();
+    }
+    function deletePhase(sc, index){
+      if (!sc) return;
+      if (index < 0 || index >= sc.phases.length) return;
+      sc.phases.splice(index, 1);
+      currentPhaseIndex = Math.min(index, sc.phases.length); // allow selecting Finish row if removed last
+      saveState(); renderScenes(); drawTimeline(); renderEditor();
+    }
+
+    // Override badge to include the Finish row and better label
+    function renderPhaseBadge(){
+      const sc=getSelectedScene();
+      const phases = sc ? getPhasesWithFinish(sc) : [];
+      const ph = phases[currentPhaseIndex];
+      const label = ph ? `${currentPhaseIndex+1}/${phases.length} - ${ph.name||'Phase'}` : '-';
+      $('#phaseBadge').textContent = label;
+    }
+
+    // ============ Wire controls
+    $('#addSceneBtn').onclick = addScene; $('#duplicateSceneBtn').onclick = duplicateScene; $('#deleteSceneBtn').onclick = deleteScene; $('#saveSceneMetaBtn').onclick=saveSceneMeta; $('#reloadVideoBtn').onclick=()=>{ const sc=getSelectedScene(); if(sc) loadSceneVideo(sc); };
+    $('#exportBtn').onclick = ()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='adaptive-scenes-timeline.json'; a.click(); URL.revokeObjectURL(a.href); };
+
+    $('#importBtn').onclick = ()=>{
+      const fi = $('#fileImport');
+      if (!fi) { alert('Import input not found'); return; }
+      fi.value = '';
+      fi.onchange = ()=>{
+        const file = fi.files && fi.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ()=>{
+          try {
+            const data = JSON.parse(reader.result);
+            if (!data || !Array.isArray(data.scenes)) { alert('Invalid file: missing "scenes" array'); return; }
+            state = { scenes: data.scenes || [], selectedSceneId: data.selectedSceneId || (data.scenes[0]?.id || null) };
+            saveState(); renderScenes(); const sc = getSelectedScene(); if (sc) loadSceneVideo(sc);
+            alert('Import successful');
+          } catch (e) { console.error(e); alert('Invalid JSON file'); }
+        };
+        reader.readAsText(file);
+      };
+      fi.click();
+    };
+
+    $('#playSceneBtn').onclick = playScene; $('#pauseBtn').onclick = pause; $('#prevPhaseBtn').onclick = prevPhase; $('#nextPhaseBtn').onclick = nextPhase;
+
+    // Shortcuts
+    window.addEventListener('keydown', (e)=>{
+      const tag=(e.target.tagName||'').toLowerCase(); const typing=tag==='input'||tag==='textarea';
+      if(!typing && e.code==='Space'){ e.preventDefault(); try{ const ps=player.getPlayerState(); if(ps===YT.PlayerState.PLAYING) pause(); else player.playVideo(); }catch(_){} }
+      if(!typing && e.key==='['){ e.preventDefault(); prevPhase(); }
+      if(!typing && e.key===']'){ e.preventDefault(); nextPhase(); }
+    });
+  </script>
+  <input type="file" id="fileImport" accept="application/json" style="display:none" />
+</body>
+</html>
