@@ -1,12 +1,10 @@
-````markdown
 # 🎵 Dynamic Boss Music Designer
 
 **Live Demo:** [svenschultze.github.io/dynamic-boss-music](https://svenschultze.github.io/dynamic-boss-music/)
 
 An interactive web app for designing **adaptive boss battle music** scenes — inspired by *Dark Souls*, *Elden Ring*, and other games with multi-phase combat music.
-<img width="2485" height="1255" alt="image" src="https://github.com/user-attachments/assets/c32871c4-4f0c-4bed-b6a1-9f5ae8618d42" />
 
----
+<img width="2485" height="1255" alt="image" src="https://github.com/user-attachments/assets/c32871c4-4f0c-4bed-b6a1-9f5ae8618d42" />
 
 ## ⚙️ Features
 
@@ -59,7 +57,7 @@ You can also run it locally:
 git clone https://github.com/svenschultze/dynamic-boss-music.git
 cd dynamic-boss-music
 # open index.html in your browser - maybe you'll have to start a web server because of the youtube API
-````
+```
 
 ---
 
