@@ -200,8 +200,8 @@
 
     // Seed
     loadState();
-    if(!state.scenes.length){ state.scenes.push({ id: uid(), name: 'Example: Direct Timeline', url:'https://www.youtube.com/watch?v=jfKfPfyJRdk', phases:[ {id:uid(), name:'Phase 1', start:0, loopStart:10, loopEnd:22}, {id:uid(), name:'Phase 2', start:22, loopStart:40, loopEnd:58}, {id:uid(), name:'Phase 3', start:58, loopStart:75, loopEnd:95} ] }); state.selectedSceneId = state.scenes[0].id; saveState(); }
-
+    if(!state.scenes.length){ state.scenes = [ { id: "75xx6ko", name: "Slave Knight Gael", url: "https://www.youtube.com/watch?v=YWSJkdR49PI", phases: [ { id: "ght0hej", name: "Setup", start: 0, loopStart: 33.3, loopEnd: 113.18 }, { id: "9qbu35e", name: "Battle", start: 113.18, loopStart: 126.3, loopEnd: 219 }, { id: "3idl5sv", name: "Finale", start: 219, loopStart: 246, loopEnd: 306.5 } ] }, { id: "jpioxka", name: "Bayle the Dread", url: "XFIiCkQx6e4", phases: [ { id: "o4ys1u3", name: "Intro", start: 0, loopStart: 2, loopEnd: 50.5 }, { id: "csam630", name: "Bridge", start: 50.5, loopStart: 60.5, loopEnd: 98.3 }, { id: "gjk16gh", name: "Finale", start: 98.3, loopStart: 122.5, loopEnd: 200.8 } ] } ]; state.selectedSceneId = "75xx6ko"; saveState(); }
+    
     // ============ UI Render (Scenes sidebar + meta)
     function renderScenes(){
       const list=$('#sceneList'); list.innerHTML='';
